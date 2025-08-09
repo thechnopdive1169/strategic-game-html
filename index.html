@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SL - HTML Edition</title>
+    <link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- Top UI Bar -->
+        <div id="topBar">
+            <div class="resource" id="gold">Gold: <span>1000</span></div>
+            <div class="resource" id="wood">Wood: <span>500</span></div>
+            <div class="resource" id="stone">Stone: <span>300</span></div>
+            <div class="resource" id="food">Food: <span>200</span></div>
+            <div class="resource" id="honor">Honor: <span>0</span></div>
+            <div class="resource" id="glory">Glory: <span>0</span></div>
+        </div>
+
+        <!-- Game Canvas -->
+        <canvas id="gameCanvas" width="1200" height="800"></canvas>
+
+        <!-- Building Panel -->
+        <div id="buildingPanel">
+            <div class="panel-section" id="militaryBuildings">
+                <h3>Military</h3>
+                <button class="build-btn" data-building="barracks">Barracks</button>
+                <button class="build-btn" data-building="archery">Archery Range</button>
+                <button class="build-btn" data-building="stable">Stable</button>
+            </div>
+            <div class="panel-section" id="economicBuildings">
+                <h3>Economy</h3>
+                <button class="build-btn" data-building="woodcamp">Wood Camp</button>
+                <button class="build-btn" data-building="quarry">Quarry</button>
+                <button class="build-btn" data-building="farm">Farm</button>
+            </div>
+            <div class="panel-section" id="defensiveBuildings">
+                <h3>Defense</h3>
+                <button class="build-btn" data-building="wall">Wall</button>
+                <button class="build-btn" data-building="tower">Tower</button>
+                <button class="build-btn" data-building="gatehouse">Gatehouse</button>
+            </div>
+        </div>
+
+        <!-- Unit Panel -->
+        <div id="unitPanel">
+            <div class="panel-section">
+                <h3>Units</h3>
+                <button class="unit-btn" data-unit="spearman">Spearman</button>
+                <button class="unit-btn" data-unit="archer">Archer</button>
+                <button class="unit-btn" data-unit="knight">Knight</button>
+            </div>
+        </div>
+
+        <!-- Special Powers Panel -->
+        <div id="powersPanel">
+            <h3>Special Powers</h3>
+            <button class="power-btn" data-power="dragon" disabled>Dragon Egg</button>
+            <button class="power-btn" data-power="heal" disabled>Heal</button>
+        </div>
+    </div>
+
+    <script src="js/resources.js"></script>
+    <script src="js/buildings.js"></script>
+    <script src="js/units.js"></script>
+    <script src="js/factions.js"></script>
+    <script src="js/engine.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>
