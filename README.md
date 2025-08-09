@@ -1,6 +1,6 @@
 # strategic-game-html
-/
-├── index.html
+* /
+* ├── index.html
 ├── css/
 │   └── game.css
 ├── js/
