@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strategy Game - HTML Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            overflow: hidden;
+        }
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        #topBar {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            display: flex;
+            justify-content: space-around;
+            border-bottom: 2px solid #3498db;
+        }
+        .resource {
+            background: rgba(52, 152, 219, 0.2);
+            padding: 5px 15px;
+            border-radius: 15px;
+            border: 1px solid #3498db;
+            font-weight: bold;
+        }
+        .resource span {
+            color: #f39c12;
+        }
+        #gameCanvas {
+            flex: 1;
+            background: #1a1a1a;
+            cursor: crosshair;
+        }
+        #sidePanel {
+            position: absolute;
+            right: 0;
+            top: 80px;
+            width: 250px;
+            background: rgba(0, 0, 0, 0.9);
+            border-left: 2px solid #3498db;
+            padding: 15px;
+            height: calc(100vh - 80px);
+            overflow-y: auto;
+        }
+        .panel-section {
+            margin-bottom: 20px;
+        }
+        .panel-section h3 {
+            color: #3498db;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #3498db;
+            padding-bottom: 5px;
+        }
+        .build-btn, .unit-btn, .power-btn, .faction-btn {
+            width: 100%;
+            padding: 8px;
+            margin: 2px 0;
+            background: linear-gradient(145deg, #34495e, #2c3e50);
+            border: 1px solid #3498db;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        .build-btn:hover, .unit-btn:hover, .power-btn:hover, .faction-btn:hover {
+            background: linear-gradient(145deg, #3498db, #2980b9);
+            transform: translateY(-2px);
+        }
+        .build-btn:disabled, .unit-btn:disabled, .power-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        #factionSelection {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid #3498db;
+            text-align: center;
+            z-index: 1000;
+        }
+        #factionSelection h2 {
+            color: #3498db;
+            margin-bottom: 20px;
+        }
+        .faction-btn {
+            width: 150px;
+            height: 50px;
+            margin: 10px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .faction-good { background: linear-gradient(145deg, #0066ff, #004499); }
+        .faction-ice { background: linear-gradient(145deg, #66ccff, #3399cc); }
+        .faction-evil { background: linear-gradient(145deg, #cc0000, #990000); }
+        #gameInfo {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #3498db;
+        }
+        .cooldown-bar {
+            width: 100%;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 2px;
+        }
+        .cooldown-progress {
+            height: 100%;
+            background: #e74c3c;
+            transition: width 0.1s;
+        }
+        #startMessage {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px 25px;
+            border-radius: 10px;
+            border: 1px solid #f39c12;
+            color: #f39c12;
+            font-weight: bold;
+            z-index: 100;
+        }
+        #debugInfo {
+            position: absolute;
+            top: 80px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #e74c3c;
+            font-size: 12px;
+            max-width: 300px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- Top UI Bar -->
+        <div id="topBar">
+            <div class="resource" id="gold">Gold: <span>1000</span></div>
+            <div class="resource" id="wood">Wood: <span>500</span></div>
+            <div class="resource" id="stone">Stone: <span>300</span></div>
+            <div class="resource" id="food">Food: <span>200</span></div>
+            <div class="resource" id="honor">Honor: <span>0</span></div>
+            <div class="resource" id="glory">Glory: <span>0</span></div>
+        </div>
+        <!-- Game Canvas -->
+        <canvas id="gameCanvas" width="1200" height="800"></canvas>
+        <!-- Debug Info -->
+        <div id="debugInfo">
+            <div>Selected Building: <span id="selectedBuildingDebug">None</span></div>
+            <div>Mouse Pos: <span id="mousePosDebug">0, 0</span></div>
+            <div>Grid Pos: <span id="gridPosDebug">0, 0</span></div>
+            <div>Can Afford: <span id="canAffordDebug">-</span></div>
+            <div>Can Place: <span id="canPlaceDebug">-</span></div>
+            <div style="margin-top: 10px; font-size: 10px; color: #f39c12;">Press D to toggle debug info</div>
+        </div>
+        <!-- Side Panel -->
+        <div id="sidePanel">
+            <div class="panel-section">
+                <h3>Military Buildings</h3>
+                <button class="build-btn" data-building="barracks">Barracks (200g, 100w, 50s)</button>
+                <button class="build-btn" data-building="archery">Archery Range (150g, 80w, 30s)</button>
+                <button class="build-btn" data-building="stable">Stable (300g, 150w, 100s)</button>
+            </div>
+            
+            <div class="panel-section">
+                <h3>Economic Buildings</h3>
+                <button class="build-btn" data-building="woodcamp">Wood Camp (50g, 20s)</button>
+                <button class="build-btn" data-building="quarry">Quarry (100g, 50w)</button>
+                <button class="build-btn" data-building="farm">Farm (80g, 40w, 20s)</button>
+            </div>
+            
+            <div class="panel-section">
+                <h3>Defensive Buildings</h3>
+                <button class="build-btn" data-building="wall">Wall (10g, 20s)</button>
+                <button class="build-btn" data-building="tower">Tower (150g, 50w, 100s)</button>
+                <button class="build-btn" data-building="gatehouse">Gatehouse (100g, 30w, 80s)</button>
+            </div>
+            
+            <div class="panel-section">
+                <h3>Units</h3>
+                <button class="unit-btn" data-unit="spearman">Spearman (20g)</button>
+                <button class="unit-btn" data-unit="archer">Archer (25g)</button>
+                <button class="unit-btn" data-unit="knight">Knight (50g, 10h)</button>
+            </div>
+            
+            <div class="panel-section">
+                <h3>Special Powers</h3>
+                <button class="power-btn" data-power="dragon">Dragon Egg (100h)</button>
+                <div class="cooldown-bar"><div class="cooldown-progress" id="dragonCooldown"></div></div>
+            </div>
+        </div>
+        <!-- Game Info -->
+        <div id="gameInfo">
+            <div>Faction: <span id="currentFaction">None</span></div>
+            <div>Your Units: <span id="unitCount">0</span></div>
+            <div>Enemy Units: <span id="enemyCount">0</span></div>
+            <div>Buildings: <span id="buildingCount">0</span></div>
+            <div>Game Time: <span id="gameTime">0:00</span></div>
+        </div>
+        <!-- Start Message -->
+        <div id="startMessage" style="display: none;"></div>
+        <!-- Faction Selection -->
+        <div id="factionSelection">
+            <h2>Choose Your Faction</h2>
+            <button class="faction-btn faction-good" data-faction="good">Good</button>
+            <button class="faction-btn faction-ice" data-faction="ice">Ice</button>
+            <button class="faction-btn faction-evil" data-faction="evil">Evil</button>
+        </div>
+    </div>
+    <script>
+        // Game Constants
+        const GRID_SIZE = 32;
+        const CANVAS_WIDTH = 1200;
+        const CANVAS_HEIGHT = 800;
+        // Faction System
+        class Faction {
+            constructor(name, color, specialUnits, abilities) {
+                this.name = name;
+                this.color = color;
+                this.specialUnits = specialUnits;
+                this.abilities = abilities;
+                this.dragonCooldown = 0;
+            }
+            canSummonDragon() {
+                return this.dragonCooldown <= 0;
+            }
+            summonDragon() {
+                if (this.canSummonDragon()) {
+                    this.dragonCooldown = 60000; // 60 seconds
+                    return true;
+                }
+                return false;
+            }
+        }
+        const Factions = {
+            good: new Faction(
+                'good',
+                '#0066ff',
+                ['roundTableKnight', 'arthur'],
+                [
+                    { name: 'holyLight', cooldown: 30000, effect: 'heal' },
+                    { name: 'divineShield', cooldown: 45000, effect: 'protection' }
+                ]
+            ),
+            ice: new Faction(
+                'ice',
+                '#66ccff',
+                ['frostGiant', 'iceDragon'],
+                [
+                    { name: 'freeze', cooldown: 25000, effect: 'slow' },
+                    { name: 'blizzard', cooldown: 40000, effect: 'areaDamage' }
+                ]
+            ),
+            evil: new Faction(
+                'evil',
+                '#cc0000',
+                ['werewolf', 'vampire'],
+                [
+                    { name: 'curse', cooldown: 20000, effect: 'weaken' },
+                    { name: 'summonBats', cooldown: 35000, effect: 'swarm' }
+                ]
+            )
+        };
+        // Building Class
+        class Building {
+            constructor(type, x, y, faction) {
+                this.type = type;
+                this.x = x;
+                this.y = y;
+                this.faction = faction;
+                this.health = 100;
+                this.maxHealth = 100;
+                this.completed = false;
+                this.constructionProgress = 0;
+                this.cost = this.getCost();
+                this.resourceGeneration = this.getResourceGeneration();
+                this.size = this.getSize();
+            }
+            getCost() {
+                const costs = {
+                    barracks: { gold: 200, wood: 100, stone: 50 },
+                    archery: { gold: 150, wood: 80, stone: 30 },
+                    stable: { gold: 300, wood: 150, stone: 100 },
+                    woodcamp: { gold: 50, wood: 0, stone: 20 },
+                    quarry: { gold: 100, wood: 50, stone: 0 },
+                    farm: { gold: 80, wood: 40, stone: 20 },
+                    wall: { gold: 10, wood: 0, stone: 20 },
+                    tower: { gold: 150, wood: 50, stone: 100 },
+                    gatehouse: { gold: 100, wood: 30, stone: 80 }
+                };
+                return costs[this.type] || { gold: 0, wood: 0, stone: 0 };
+            }
+            getResourceGeneration() {
+                const generation = {
+                    woodcamp: { wood: 2 },
+                    quarry: { stone: 1 },
+                    farm: { food: 3 }
+                };
+                return generation[this.type] || {};
+            }
+            getSize() {
+                const sizes = {
+                    barracks: { width: 3, height: 3 },
+                    archery: { width: 2, height: 2 },
+                    stable: { width: 3, height: 3 },
+                    woodcamp: { width: 2, height: 2 },
+                    quarry: { width: 2, height: 2 },
+                    farm: { width: 3, height: 3 },
+                    wall: { width: 1, height: 1 },
+                    tower: { width: 2, height: 2 },
+                    gatehouse: { width: 2, height: 1 }
+                };
+                return sizes[this.type] || { width: 1, height: 1 };
+            }
+            update(deltaTime) {
+                if (!this.completed) {
+                    this.constructionProgress += deltaTime * 0.001;
+                    if (this.constructionProgress >= 1) {
+                        this.completed = true;
+                    }
+                }
+            }
+            render(ctx) {
+                const alpha = this.completed ? 1 : 0.5;
+                
+                // Building base
+                ctx.fillStyle = this.getFactionColor(this.faction, alpha);
+                ctx.fillRect(this.x, this.y, this.size.width * GRID_SIZE, this.size.height * GRID_SIZE);
+                
+                // Building outline
+                ctx.strokeStyle = this.getFactionColor(this.faction, 1);
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x, this.y, this.size.width * GRID_SIZE, this.size.height * GRID_SIZE);
+                
+                // Draw building-specific graphics
+                this.drawBuildingSpecific(ctx);
+                
+                // Construction progress
+                if (!this.completed) {
+                    ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
+                    ctx.fillRect(this.x, this.y + this.size.height * GRID_SIZE - 5, 
+                                this.size.width * GRID_SIZE * this.constructionProgress, 5);
+                }
+                
+                // Health bar
+                if (this.health < this.maxHealth) {
+                    const barWidth = this.size.width * GRID_SIZE;
+                    const barHeight = 4;
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(this.x, this.y - 10, barWidth, barHeight);
+                    ctx.fillStyle = 'green';
+                    ctx.fillRect(this.x, this.y - 10, barWidth * (this.health / this.maxHealth), barHeight);
+                }
+                
+                // Building icon/text
+                ctx.fillStyle = 'white';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(this.type, this.x + (this.size.width * GRID_SIZE) / 2, this.y + (this.size.height * GRID_SIZE) / 2);
+            }
+            drawBuildingSpecific(ctx) {
+                const centerX = this.x + (this.size.width * GRID_SIZE) / 2;
+                const centerY = this.y + (this.size.height * GRID_SIZE) / 2;
+                
+                switch(this.type) {
+                    case 'barracks':
+                        // Draw crossed swords
+                        ctx.strokeStyle = 'silver';
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.moveTo(centerX - 10, centerY - 10);
+                        ctx.lineTo(centerX + 10, centerY + 10);
+                        ctx.moveTo(centerX + 10, centerY - 10);
+                        ctx.lineTo(centerX - 10, centerY + 10);
+                        ctx.stroke();
+                        break;
+                    case 'archery':
+                        // Draw bow
+                        ctx.strokeStyle = 'brown';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(centerX, centerY, 15, 0, Math.PI);
+                        ctx.stroke();
+                        break;
+                    case 'stable':
+                        // Draw horse head
+                        ctx.fillStyle = 'brown';
+                        ctx.beginPath();
+                        ctx.arc(centerX, centerY, 12, 0, Math.PI * 2);
+                        ctx.fill();
+                        break;
+                    case 'woodcamp':
+                        // Draw tree
+                        ctx.fillStyle = 'green';
+                        ctx.beginPath();
+                        ctx.arc(centerX, centerY - 5, 10, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = 'brown';
+                        ctx.fillRect(centerX - 2, centerY, 4, 10);
+                        break;
+                    case 'quarry':
+                        // Draw rock
+                        ctx.fillStyle = 'gray';
+                        ctx.fillRect(centerX - 8, centerY - 8, 16, 16);
+                        break;
+                    case 'farm':
+                        // Draw wheat
+                        ctx.fillStyle = 'gold';
+                        for(let i = 0; i < 5; i++) {
+                            ctx.fillRect(centerX - 10 + i * 5, centerY - 5, 2, 10);
+                        }
+                        break;
+                    case 'tower':
+                        // Draw tower
+                        ctx.fillStyle = 'gray';
+                        ctx.fillRect(centerX - 8, centerY - 15, 16, 30);
+                        ctx.fillStyle = 'red';
+                        ctx.beginPath();
+                        ctx.arc(centerX, centerY - 15, 5, 0, Math.PI * 2);
+                        ctx.fill();
+                        break;
+                    case 'gatehouse':
+                        // Draw gate
+                        ctx.fillStyle = 'brown';
+                        ctx.fillRect(centerX - 15, centerY - 10, 30, 20);
+                        ctx.fillStyle = 'black';
+                        ctx.fillRect(centerX - 10, centerY - 5, 20, 10);
+                        break;
+                }
+            }
+            getFactionColor(faction, alpha = 1) {
+                const colors = {
+                    good: `rgba(0, 100, 255, ${alpha})`,
+                    ice: `rgba(100, 200, 255, ${alpha})`,
+                    evil: `rgba(200, 0, 0, ${alpha})`
+                };
+                return colors[faction] || `rgba(128, 128, 128, ${alpha})`;
+            }
+        }
+        // Unit Class
+        class Unit {
+            constructor(type, x, y, faction) {
+                this.type = type;
+                this.x = x;
+                this.y = y;
+                this.faction = faction;
+                this.health = 100;
+                this.maxHealth = 100;
+                this.speed = this.getSpeed();
+                this.damage = this.getDamage();
+                this.range = this.getRange();
+                this.cost = this.getCost();
+                this.target = null;
+                this.path = [];
+                this.abilities = this.getAbilities();
+                this.cooldowns = {};
+                this.lastAttack = 0;
+                this.attackSpeed = 1000; // 1 second between attacks
+            }
+            getSpeed() {
+                const speeds = {
+                    spearman: 50,
+                    archer: 40,
+                    knight: 80
+                };
+                return speeds[this.type] || 50;
+            }
+            getDamage() {
+                const damages = {
+                    spearman: 15,
+                    archer: 10,
+                    knight: 25
+                };
+                return damages[this.type] || 10;
+            }
+            getRange() {
+                const ranges = {
+                    spearman: 30,
+                    archer: 150,
+                    knight: 40
+                };
+                return ranges[this.type] || 30;
+            }
+            getCost() {
+                const costs = {
+                    spearman: { gold: 20, honor: 0 },
+                    archer: { gold: 25, honor: 0 },
+                    knight: { gold: 50, honor: 10 }
+                };
+                return costs[this.type] || { gold: 10, honor: 0 };
+            }
+            getAbilities() {
+                const abilities = {
+                    knight: [
+                        { name: 'charge', cooldown: 10000, duration: 2000 }
+                    ]
+                };
+                return abilities[this.type] || [];
+            }
+            update(deltaTime) {
+                // Update cooldowns
+                Object.keys(this.cooldowns).forEach(ability => {
+                    this.cooldowns[ability] = Math.max(0, this.cooldowns[ability] - deltaTime);
+                });
+                
+                // Find nearest enemy if no target
+                if (!this.target) {
+                    this.findNearestEnemy();
+                }
+                
+                // Move towards target or follow path
+                if (this.target) {
+                    this.moveTowardsTarget(deltaTime);
+                } else if (this.path.length > 0) {
+                    this.followPath(deltaTime);
+                }
+                
+                // Attack if in range
+                if (this.target && this.isInRange(this.target)) {
+                    this.attack(deltaTime);
+                }
+            }
+            findNearestEnemy() {
+                const enemies = this.faction === 'player' ? 
+                    this.getEnemyUnits() : this.getPlayerUnits();
+                
+                let nearestEnemy = null;
+                let nearestDistance = Infinity;
+                
+                enemies.forEach(enemy => {
+                    const dx = enemy.x - this.x;
+                    const dy = enemy.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < nearestDistance && distance < 200) { // Detection range
+                        nearestDistance = distance;
+                        nearestEnemy = enemy;
+                    }
+                });
+                
+                this.target = nearestEnemy;
+            }
+            getEnemyUnits() {
+                return window.game.gameState.units.filter(unit => unit.faction !== this.faction);
+            }
+            getPlayerUnits() {
+                return window.game.gameState.units.filter(unit => unit.faction === window.game.gameState.currentFaction);
+            }
+            moveTowardsTarget(deltaTime) {
+                const dx = this.target.x - this.x;
+                const dy = this.target.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance > this.range) {
+                    const moveX = (dx / distance) * this.speed * deltaTime * 0.001;
+                    const moveY = (dy / distance) * this.speed * deltaTime * 0.001;
+                    this.x += moveX;
+                    this.y += moveY;
+                }
+            }
+            followPath(deltaTime) {
+                if (this.path.length === 0) return;
+                
+                const target = this.path[0];
+                const dx = target.x - this.x;
+                const dy = target.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < 5) {
+                    this.path.shift();
+                } else {
+                    const moveX = (dx / distance) * this.speed * deltaTime * 0.001;
+                    const moveY = (dy / distance) * this.speed * deltaTime * 0.001;
+                    this.x += moveX;
+                    this.y += moveY;
+                }
+            }
+            isInRange(target) {
+                const dx = target.x - this.x;
+                const dy = target.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                return distance <= this.range;
+            }
+            attack(deltaTime) {
+                const currentTime = Date.now();
+                if (currentTime - this.lastAttack > this.attackSpeed) {
+                    this.lastAttack = currentTime;
+                    if (this.target && this.target.health) {
+                        this.target.health -= this.damage;
+                        if (this.target.health <= 0) {
+                            this.target = null;
+                        }
+                    }
+                }
+            }
+            useAbility(abilityName) {
+                const ability = this.abilities.find(a => a.name === abilityName);
+                if (ability && !this.cooldowns[abilityName]) {
+                    this.cooldowns[abilityName] = ability.cooldown;
+                    this.applyAbilityEffect(ability);
+                }
+            }
+            applyAbilityEffect(ability) {
+                switch (ability.name) {
+                    case 'charge':
+                        this.speed *= 2;
+                        setTimeout(() => {
+                            this.speed /= 2;
+                        }, ability.duration);
+                        break;
+                }
+            }
+            render(ctx) {
+                // Unit body
+                ctx.fillStyle = this.getFactionColor(this.faction);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw unit-specific graphics
+                this.drawUnitSpecific(ctx);
+                
+                // Unit outline
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                // Health bar
+                if (this.health < this.maxHealth) {
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(this.x - 10, this.y - 15, 20, 3);
+                    ctx.fillStyle = 'green';
+                    ctx.fillRect(this.x - 10, this.y - 15, 20 * (this.health / this.maxHealth), 3);
+                }
+                
+                // Unit type indicator
+                ctx.fillStyle = 'white';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(this.type[0].toUpperCase(), this.x, this.y + 3);
+            }
+            drawUnitSpecific(ctx) {
+                switch(this.type) {
+                    case 'spearman':
+                        // Draw spear
+                        ctx.strokeStyle = 'brown';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(this.x, this.y - 5);
+                        ctx.lineTo(this.x, this.y - 15);
+                        ctx.stroke();
+                        break;
+                    case 'archer':
+                        // Draw bow
+                        ctx.strokeStyle = 'brown';
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, 6, 0, Math.PI);
+                        ctx.stroke();
+                        break;
+                    case 'knight':
+                        // Draw helmet
+                        ctx.fillStyle = 'silver';
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y - 3, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                        break;
+                }
+            }
+            getFactionColor(faction) {
+                const colors = {
+                    player: '#00ff00',
+                    enemy: '#ff0000',
+                    good: '#0066ff',
+                    ice: '#66ccff',
+                    evil: '#cc0000'
+                };
+                return colors[faction] || '#888888';
+            }
+        }
+        // Dragon Class
+        class Dragon {
+            constructor(x, y, faction) {
+                this.x = x;
+                this.y = y;
+                this.faction = faction;
+                this.health = 500;
+                this.maxHealth = 500;
+                this.speed = 100;
+                this.damage = 50;
+                this.lifespan = 30000; // 30 seconds
+                this.age = 0;
+                this.target = null;
+            }
+            update(deltaTime) {
+                this.age += deltaTime;
+                
+                if (this.age >= this.lifespan) {
+                    return false; // Dragon dies
+                }
+                
+                // Find nearest enemy
+                if (!this.target) {
+                    this.findNearestEnemy();
+                }
+                
+                // Move towards target
+                if (this.target) {
+                    const dx = this.target.x - this.x;
+                    const dy = this.target.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance > 50) {
+                        const moveX = (dx / distance) * this.speed * deltaTime * 0.001;
+                        const moveY = (dy / distance) * this.speed * deltaTime * 0.001;
+                        this.x += moveX;
+                        this.y += moveY;
+                    } else {
+                        // Attack target
+                        if (this.target.health) {
+                            this.target.health -= this.damage * deltaTime * 0.001;
+                        }
+                    }
+                }
+                
+                return true; // Dragon is still alive
+            }
+            findNearestEnemy() {
+                const enemies = this.faction === window.game.gameState.currentFaction ? 
+                    window.game.gameState.units.filter(unit => unit.faction !== this.faction) :
+                    window.game.gameState.units.filter(unit => unit.faction === window.game.gameState.currentFaction);
+                
+                let nearestEnemy = null;
+                let nearestDistance = Infinity;
+                
+                enemies.forEach(enemy => {
+                    const dx = enemy.x - this.x;
+                    const dy = enemy.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < nearestDistance) {
+                        nearestDistance = distance;
+                        nearestEnemy = enemy;
+                    }
+                });
+                
+                this.target = nearestEnemy;
+            }
+            render(ctx) {
+                // Dragon body
+                ctx.fillStyle = this.getFactionColor(this.faction);
+                ctx.beginPath();
+                ctx.ellipse(this.x, this.y, 20, 15, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Dragon wings
+                ctx.fillStyle = this.getFactionColor(this.faction, 0.7);
+                ctx.beginPath();
+                ctx.ellipse(this.x - 15, this.y, 15, 8, -0.5, 0, Math.PI * 2);
+                ctx.ellipse(this.x + 15, this.y, 15, 8, 0.5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Dragon head
+                ctx.fillStyle = this.getFactionColor(this.faction);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y - 10, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Health bar
+                if (this.health < this.maxHealth) {
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(this.x - 25, this.y - 30, 50, 4);
+                    ctx.fillStyle = 'green';
+                    ctx.fillRect(this.x - 25, this.y - 30, 50 * (this.health / this.maxHealth), 4);
+                }
+                
+                // Lifespan indicator
+                const lifespanPercent = 1 - (this.age / this.lifespan);
+                ctx.fillStyle = 'orange';
+                ctx.fillRect(this.x - 25, this.y - 35, 50 * lifespanPercent, 2);
+            }
+            getFactionColor(faction, alpha = 1) {
+                const colors = {
+                    good: `rgba(255, 215, 0, ${alpha})`, // Gold dragon
+                    ice: `rgba(173, 216, 230, ${alpha})`, // Light blue dragon
+                    evil: `rgba(139, 0, 0, ${alpha})` // Dark red dragon
+                };
+                return colors[faction] || `rgba(128, 128, 128, ${alpha})`;
+            }
+        }
+        // Game Engine Class
+        class GameEngine {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.gameState = {
+                    resources: {
+                        gold: 1000,
+                        wood: 500,
+                        stone: 300,
+                        food: 200,
+                        honor: 0,
+                        glory: 0
+                    },
+                    buildings: [],
+                    units: [],
+                    dragons: [],
+                    selectedUnits: [],
+                    selectedBuilding: null,
+                    currentFaction: null,
+                    gameTime: 0,
+                    paused: false,
+                    gameStarted: false,
+                    enemySpawnTimer: 0,
+                    gameStartTime: 0
+                };
+                
+                this.camera = { x: 0, y: 0, zoom: 1 };
+                this.gridSize = GRID_SIZE;
+                this.lastTime = 0;
+                this.dragSelecting = false;
+                this.dragStart = { x: 0, y: 0 };
+                this.dragEnd = { x: 0, y: 0 };
+                this.mousePos = { x: 0, y: 0 };
+                this.debugMode = false;
+                
+                this.init();
+            }
+            init() {
+                console.log("Game Engine Initializing...");
+                this.setupEventListeners();
+                this.gameLoop();
+                this.startResourceGeneration();
+                this.updateUI();
+                console.log("Game Engine Started Successfully!");
+            }
+            setupEventListeners() {
+                // Canvas events
+                this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
+                this.canvas.addEventListener('contextmenu', (e) => this.handleRightClick(e));
+                this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+                this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+                this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                
+                // Building buttons
+                document.querySelectorAll('.build-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => this.selectBuilding(e.target.dataset.building));
+                });
+                
+                // Unit buttons
+                document.querySelectorAll('.unit-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => this.spawnUnit(e.target.dataset.unit));
+                });
+                
+                // Power buttons
+                document.querySelectorAll('.power-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => this.usePower(e.target.dataset.power));
+                });
+                
+                // Faction buttons
+                document.querySelectorAll('.faction-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => this.selectFaction(e.target.dataset.faction));
+                });
+                
+                // Keyboard controls
+                document.addEventListener('keydown', (e) => this.handleKeyDown(e));
+            }
+            handleMouseMove(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                this.mousePos.x = e.clientX - rect.left;
+                this.mousePos.y = e.clientY - rect.top;
+                
+                if (this.debugMode) {
+                    const worldX = (this.mousePos.x / this.camera.zoom) + this.camera.x;
+                    const worldY = (this.mousePos.y / this.camera.zoom) + this.camera.y;
+                    const gridX = Math.floor(worldX / this.gridSize);
+                    const gridY = Math.floor(worldY / this.gridSize);
+                    
+                    document.getElementById('mousePosDebug').textContent = `${Math.floor(worldX)}, ${Math.floor(worldY)}`;
+                    document.getElementById('gridPosDebug').textContent = `${gridX}, ${gridY}`;
+                    
+                    if (this.selectedBuilding) {
+                        const testBuilding = new Building(this.selectedBuilding, gridX * this.gridSize, gridY * this.gridSize, this.gameState.currentFaction);
+                        document.getElementById('canAffordDebug').textContent = this.canAffordBuilding(testBuilding);
+                        document.getElementById('canPlaceDebug').textContent = this.canPlaceBuilding(testBuilding);
+                    }
+                }
+                
+                if (this.dragSelecting) {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    
+                    this.dragEnd = {
+                        x: (x / this.camera.zoom) + this.camera.x,
+                        y: (y / this.camera.zoom) + this.camera.y
+                    };
+                }
+            }
+            selectFaction(faction) {
+                console.log("Selected faction:", faction);
+                this.gameState.currentFaction = faction;
+                this.gameState.gameStarted = true;
+                document.getElementById('factionSelection').style.display = 'none';
+                this.initializeGame();
+                this.updateUI();
+            }
+            initializeGame() {
+                console.log("Initializing game...");
+                
+                // Create starting buildings
+                const barracks = new Building('barracks', 200, 200, this.gameState.currentFaction);
+                barracks.completed = true;
+                this.gameState.buildings.push(barracks);
+                
+                // Center camera on starting position
+                this.camera.x = 200 - this.canvas.width / 2;
+                this.camera.y = 200 - this.canvas.height / 2;
+                
+                // Spawn starting units
+                this.spawnStartingUnits();
+                
+                // Show start message
+                this.showStartMessage('Game Started! Build your base and defend against enemies!');
+                
+                console.log("Game initialized successfully!");
+            }
+            spawnStartingUnits() {
+                const startX = 250;
+                const startY = 250;
+                
+                const unitTypes = ['spearman', 'archer', 'spearman'];
+                unitTypes.forEach((type, index) => {
+                    const unit = new Unit(type, startX + index * 30, startY, 'player');
+                    this.gameState.units.push(unit);
+                });
+            }
+            showStartMessage(message) {
+                const messageDiv = document.getElementById('startMessage');
+                messageDiv.textContent = message;
+                messageDiv.style.display = 'block';
+                
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                }, 5000);
+            }
+            handleCanvasClick(e) {
+                if (!this.gameState.gameStarted) return;
+                
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const worldX = (x / this.camera.zoom) + this.camera.x;
+                const worldY = (y / this.camera.zoom) + this.camera.y;
+                
+                if (this.selectedBuilding) {
+                    this.placeBuilding(worldX, worldY);
+                }
+            }
+            handleRightClick(e) {
+                if (!this.gameState.gameStarted) return;
+                
+                e.preventDefault();
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const worldX = (x / this.camera.zoom) + this.camera.x;
+                const worldY = (y / this.camera.zoom) + this.camera.y;
+                
+                // Move selected units to clicked position
+                this.gameState.selectedUnits.forEach(unit => {
+                    unit.path = [{ x: worldX, y: worldY }];
+                    unit.target = null;
+                });
+            }
+            handleMouseDown(e) {
+                if (!this.gameState.gameStarted) return;
+                
+                if (e.button === 0) { // Left click
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    
+                    const worldX = (x / this.camera.zoom) + this.camera.x;
+                    const worldY = (y / this.camera.zoom) + this.camera.y;
+                    
+                    // Check if clicking on a unit
+                    const clickedUnit = this.getUnitAt(worldX, worldY);
+                    if (clickedUnit && clickedUnit.faction === 'player') {
+                        this.gameState.selectedUnits = [clickedUnit];
+                    } else if (!this.selectedBuilding) {
+                        // Start drag selection
+                        this.dragSelecting = true;
+                        this.dragStart = { x: worldX, y: worldY };
+                        this.dragEnd = { x: worldX, y: worldY };
+                    }
+                }
+            }
+            handleMouseUp(e) {
+                if (this.dragSelecting) {
+                    this.dragSelecting = false;
+                    this.selectUnitsInDragArea();
+                }
+            }
+            selectUnitsInDragArea() {
+                const minX = Math.min(this.dragStart.x, this.dragEnd.x);
+                const maxX = Math.max(this.dragStart.x, this.dragEnd.x);
+                const minY = Math.min(this.dragStart.y, this.dragEnd.y);
+                const maxY = Math.max(this.dragStart.y, this.dragEnd.y);
+                
+                const selectedUnits = this.gameState.units.filter(unit => {
+                    return unit.x >= minX && unit.x <= maxX && 
+                           unit.y >= minY && unit.y <= maxY &&
+                           unit.faction === 'player';
+                });
+                
+                this.gameState.selectedUnits = selectedUnits;
+            }
+            getUnitAt(x, y) {
+                return this.gameState.units.find(unit => {
+                    const dx = unit.x - x;
+                    const dy = unit.y - y;
+                    return Math.sqrt(dx * dx + dy * dy) <= 15;
+                });
+            }
+            selectBuilding(buildingType) {
+                console.log("Selected building:", buildingType);
+                this.selectedBuilding = buildingType;
+                this.canvas.style.cursor = 'crosshair';
+                
+                if (this.debugMode) {
+                    document.getElementById('selectedBuildingDebug').textContent = buildingType;
+                }
+            }
+            placeBuilding(x, y) {
+                console.log("Attempting to place building at:", x, y);
+                
+                const gridX = Math.floor(x / this.gridSize);
+                const gridY = Math.floor(y / this.gridSize);
+                
+                const building = new Building(
+                    this.selectedBuilding,
+                    gridX * this.gridSize,
+                    gridY * this.gridSize,
+                    this.gameState.currentFaction
+                );
+                
+                console.log("Building created:", building);
+                console.log("Can afford:", this.canAffordBuilding(building));
+                console.log("Can place:", this.canPlaceBuilding(building));
+                
+                if (this.canAffordBuilding(building) && this.canPlaceBuilding(building)) {
+                    console.log("Placing building...");
+                    this.deductResources(building.cost);
+                    this.gameState.buildings.push(building);
+                    this.selectedBuilding = null;
+                    this.canvas.style.cursor = 'default';
+                    this.updateUI();
+                    this.showStartMessage(`${building.type} built successfully!`);
+                } else {
+                    console.log("Cannot place building");
+                    if (!this.canAffordBuilding(building)) {
+                        this.showStartMessage("Not enough resources!");
+                    } else {
+                        this.showStartMessage("Cannot place building here!");
+                    }
+                }
+            }
+            canAffordBuilding(building) {
+                const cost = building.cost;
+                return this.gameState.resources.gold >= cost.gold &&
+                       this.gameState.resources.wood >= cost.wood &&
+                       this.gameState.resources.stone >= cost.stone;
+            }
+            canPlaceBuilding(building) {
+                // Check if building is within canvas bounds
+                if (building.x < 0 || building.y < 0 || 
+                    building.x + building.size.width * this.gridSize > CANVAS_WIDTH ||
+                    building.y + building.size.height * this.gridSize > CANVAS_HEIGHT) {
+                    return false;
+                }
+                
+                // Check if building overlaps with existing buildings
+                return !this.gameState.buildings.some(existingBuilding => {
+                    return !(building.x + building.size.width * this.gridSize <= existingBuilding.x ||
+                             existingBuilding.x + existingBuilding.size.width * this.gridSize <= building.x ||
+                             building.y + building.size.height * this.gridSize <= existingBuilding.y ||
+                             existingBuilding.y + existingBuilding.size.height * this.gridSize <= building.y);
+                });
+            }
+            deductResources(cost) {
+                this.gameState.resources.gold -= cost.gold;
+                this.gameState.resources.wood -= cost.wood;
+                this.gameState.resources.stone -= cost.stone;
+                this.updateUI();
+            }
+            spawnUnit(unitType) {
+                const barracks = this.gameState.buildings.find(b => b.type === 'barracks' && b.completed);
+                if (barracks && this.canAffordUnit(unitType)) {
+                    const unit = new Unit(unitType, barracks.x, barracks.y, 'player');
+                    this.deductUnitCost(unit.cost);
+                    this.gameState.units.push(unit);
+                    this.updateUI();
+                    this.showStartMessage(`${unitType} recruited!`);
+                } else {
+                    this.showStartMessage("Need barracks and enough resources!");
+                }
+            }
+            canAffordUnit(unitType) {
+                const unit = new Unit(unitType, 0, 0, 'player');
+                const cost = unit.cost;
+                return this.gameState.resources.gold >= cost.gold &&
+                       this.gameState.resources.honor >= cost.honor;
+            }
+            deductUnitCost(cost) {
+                this.gameState.resources.gold -= cost.gold;
+                this.gameState.resources.honor -= cost.honor;
+                this.updateUI();
+            }
+            usePower(powerType) {
+                if (powerType === 'dragon' && this.gameState.resources.honor >= 100) {
+                    this.summonDragon();
+                } else {
+                    this.showStartMessage("Need 100 honor to summon dragon!");
+                }
+            }
+            summonDragon() {
+                const keep = this.gameState.buildings.find(b => b.type === 'barracks');
+                if (keep) {
+                    const dragon = new Dragon(keep.x, keep.y - 50, this.gameState.currentFaction);
+                    this.gameState.dragons = this.gameState.dragons || [];
+                    this.gameState.dragons.push(dragon);
+                    this.gameState.resources.honor -= 100;
+                    this.updateUI();
+                    this.showStartMessage('Dragon summoned!');
+                }
+            }
+            handleKeyDown(e) {
+                switch(e.key) {
+                    case ' ':
+                        this.gameState.paused = !this.gameState.paused;
+                        break;
+                    case 'Escape':
+                        this.selectedBuilding = null;
+                        this.gameState.selectedUnits = [];
+                        this.canvas.style.cursor = 'default';
+                        if (this.debugMode) {
+                            document.getElementById('selectedBuildingDebug').textContent = 'None';
+                        }
+                        break;
+                    case 'd':
+                        this.debugMode = !this.debugMode;
+                        document.getElementById('debugInfo').style.display = this.debugMode ? 'block' : 'none';
+                        break;
+                }
+                
+                // Camera movement
+                const cameraSpeed = 10;
+                switch(e.key) {
+                    case 'ArrowUp':
+                    case 'w':
+                        this.camera.y -= cameraSpeed;
+                        break;
+                    case 'ArrowDown':
+                    case 's':
+                        this.camera.y += cameraSpeed;
+                        break;
+                    case 'ArrowLeft':
+                    case 'a':
+                        this.camera.x -= cameraSpeed;
+                        break;
+                    case 'ArrowRight':
+                    case 'd':
+                        this.camera.x += cameraSpeed;
+                        break;
+                }
+            }
+            gameLoop(currentTime = 0) {
+                if (!this.gameState.paused) {
+                    const deltaTime = currentTime - this.lastTime;
+                    this.update(deltaTime);
+                    this.render();
+                }
+                this.lastTime = currentTime;
+                requestAnimationFrame((time) => this.gameLoop(time));
+            }
+            update(deltaTime) {
+                if (!this.gameState.gameStarted) return;
+                
+                this.gameState.gameTime += deltaTime;
+                
+                // Update units
+                this.gameState.units.forEach(unit => unit.update(deltaTime));
+                
+                // Update buildings
+                this.gameState.buildings.forEach(building => building.update(deltaTime));
+                
+                // Update dragons
+                if (this.gameState.dragons) {
+                    this.gameState.dragons = this.gameState.dragons.filter(dragon => dragon.update(deltaTime));
+                }
+                
+                // Remove dead units
+                this.gameState.units = this.gameState.units.filter(unit => unit.health > 0);
+                
+                // Spawn enemies
+                this.spawnEnemies(deltaTime);
+                
+                // Check win conditions
+                this.checkWinConditions();
+                
+                this.updateUI();
+            }
+            spawnEnemies(deltaTime) {
+                this.gameState.enemySpawnTimer += deltaTime;
+                
+                // Start spawning enemies after 30 seconds
+                if (this.gameState.gameTime > 30000 && this.gameState.enemySpawnTimer > 10000) {
+                    this.gameState.enemySpawnTimer = 0;
+                    this.spawnEnemyUnit();
+                }
+            }
+            spawnEnemyUnit() {
+                // Spawn enemies from the edges of the map
+                const side = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
+                let x, y;
+                
+                switch(side) {
+                    case 0: // top
+                        x = Math.random() * CANVAS_WIDTH;
+                        y = 0;
+                        break;
+                    case 1: // right
+                        x = CANVAS_WIDTH;
+                        y = Math.random() * CANVAS_HEIGHT;
+                        break;
+                    case 2: // bottom
+                        x = Math.random() * CANVAS_WIDTH;
+                        y = CANVAS_HEIGHT;
+                        break;
+                    case 3: // left
+                        x = 0;
+                        y = Math.random() * CANVAS_HEIGHT;
+                        break;
+                }
+                
+                const unitTypes = ['spearman', 'archer', 'knight'];
+                const randomType = unitTypes[Math.floor(Math.random() * unitTypes.length)];
+                
+                const enemy = new Unit(randomType, x, y, 'enemy');
+                this.gameState.units.push(enemy);
+                
+                this.showStartMessage('Enemy unit spawned!');
+            }
+            render() {
+                // Clear canvas
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Save context state
+                this.ctx.save();
+                
+                // Apply camera transform
+                this.ctx.translate(-this.camera.x * this.camera.zoom, -this.camera.y * this.camera.zoom);
+                this.ctx.scale(this.camera.zoom, this.camera.zoom);
+                
+                // Render grid
+                this.renderGrid();
+                
+                // Render buildings
+                this.gameState.buildings.forEach(building => building.render(this.ctx));
+                
+                // Render units
+                this.gameState.units.forEach(unit => unit.render(this.ctx));
+                
+                // Render dragons
+                if (this.gameState.dragons) {
+                    this.gameState.dragons.forEach(dragon => dragon.render(this.ctx));
+                }
+                
+                // Render ghost building if placing
+                if (this.selectedBuilding) {
+                    this.renderGhostBuilding();
+                }
+                
+                // Render selection box
+                this.renderSelectionBox();
+                
+                // Restore context state
+                this.ctx.restore();
+            }
+            renderGhostBuilding() {
+                const worldX = (this.mousePos.x / this.camera.zoom) + this.camera.x;
+                const worldY = (this.mousePos.y / this.camera.zoom) + this.camera.y;
+                const gridX = Math.floor(worldX / this.gridSize);
+                const gridY = Math.floor(worldY / this.gridSize);
+                
+                const building = new Building(this.selectedBuilding, gridX * this.gridSize, gridY * this.gridSize, this.gameState.currentFaction);
+                
+                // Check if can place
+                const canAfford = this.canAffordBuilding(building);
+                const canPlace = this.canPlaceBuilding(building);
+                const canBuild = canAfford && canPlace;
+                
+                // Render ghost building
+                this.ctx.globalAlpha = 0.5;
+                this.ctx.fillStyle = canBuild ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 0, 0, 0.3)';
+                this.ctx.fillRect(building.x, building.y, building.size.width * this.gridSize, building.size.height * this.gridSize);
+                
+                this.ctx.strokeStyle = canBuild ? '#00ff00' : '#ff0000';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(building.x, building.y, building.size.width * this.gridSize, building.size.height * this.gridSize);
+                
+                this.ctx.globalAlpha = 1;
+            }
+            renderGrid() {
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                this.ctx.lineWidth = 1;
+                
+                const startX = Math.floor(this.camera.x / this.gridSize) * this.gridSize;
+                const startY = Math.floor(this.camera.y / this.gridSize) * this.gridSize;
+                const endX = startX + (this.canvas.width / this.camera.zoom) + this.gridSize;
+                const endY = startY + (this.canvas.height / this.camera.zoom) + this.gridSize;
+                
+                for (let x = startX; x < endX; x += this.gridSize) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, startY);
+                    this.ctx.lineTo(x, endY);
+                    this.ctx.stroke();
+                }
+                
+                for (let y = startY; y < endY; y += this.gridSize) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(startX, y);
+                    this.ctx.lineTo(endX, y);
+                    this.ctx.stroke();
+                }
+            }
+            renderSelectionBox() {
+                // Render selected units
+                this.gameState.selectedUnits.forEach(unit => {
+                    this.ctx.strokeStyle = '#00ff00';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.beginPath();
+                    this.ctx.arc(unit.x, unit.y, 15, 0, Math.PI * 2);
+                    this.ctx.stroke();
+                });
+                
+                // Render drag selection box
+                if (this.dragSelecting) {
+                    this.ctx.strokeStyle = '#00ff00';
+                    this.ctx.lineWidth = 1;
+                    this.ctx.setLineDash([5, 5]);
+                    this.ctx.strokeRect(
+                        this.dragStart.x,
+                        this.dragStart.y,
+                        this.dragEnd.x - this.dragStart.x,
+                        this.dragEnd.y - this.dragStart.y
+                    );
+                    this.ctx.setLineDash([]);
+                }
+            }
+            startResourceGeneration() {
+                setInterval(() => {
+                    if (!this.gameState.paused && this.gameState.gameStarted) {
+                        // Generate resources from buildings
+                        this.gameState.buildings.forEach(building => {
+                            if (building.completed && building.resourceGeneration) {
+                                Object.keys(building.resourceGeneration).forEach(resource => {
+                                    this.gameState.resources[resource] += building.resourceGeneration[resource];
+                                });
+                            }
+                        });
+                        
+                        // Generate honor over time
+                        this.gameState.resources.honor += 1;
+                        
+                        this.updateUI();
+                    }
+                }, 1000);
+            }
+            updateUI() {
+                // Update resource display
+                Object.keys(this.gameState.resources).forEach(resource => {
+                    const element = document.getElementById(resource);
+                    if (element) {
+                        element.querySelector('span').textContent = Math.floor(this.gameState.resources[resource]);
+                    }
+                });
+                
+                // Update game info
+                const playerUnits = this.gameState.units.filter(unit => unit.faction === 'player');
+                const enemyUnits = this.gameState.units.filter(unit => unit.faction === 'enemy');
+                document.getElementById('unitCount').textContent = playerUnits.length;
+                document.getElementById('enemyCount').textContent = enemyUnits.length;
+                document.getElementById('buildingCount').textContent = this.gameState.buildings.length;
+                
+                // Update game time
+                const minutes = Math.floor(this.gameState.gameTime / 60000);
+                const seconds = Math.floor((this.gameState.gameTime % 60000) / 1000);
+                document.getElementById('gameTime').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                // Update buttons
+                this.updateBuildingButtons();
+                this.updateUnitButtons();
+            }
+            updateBuildingButtons() {
+                document.querySelectorAll('.build-btn').forEach(btn => {
+                    const buildingType = btn.dataset.building;
+                    const building = new Building(buildingType, 0, 0, this.gameState.currentFaction);
+                    btn.disabled = !this.canAffordBuilding(building);
+                });
+            }
+            updateUnitButtons() {
+                document.querySelectorAll('.unit-btn').forEach(btn => {
+                    const unitType = btn.dataset.unit;
+                    const canAfford = this.canAffordUnit(unitType);
+                    const hasBarracks = this.gameState.buildings.some(b => b.type === 'barracks' && b.completed);
+                    btn.disabled = !canAfford || !hasBarracks;
+                });
+            }
+            checkWinConditions() {
+                const playerUnits = this.gameState.units.filter(unit => unit.faction === 'player');
+                const enemyUnits = this.gameState.units.filter(unit => unit.faction === 'enemy');
+                
+                // Win condition: Survive for 5 minutes and eliminate all enemies
+                if (this.gameState.gameTime > 300000 && enemyUnits.length === 0) {
+                    this.showVictoryMessage();
+                }
+                
+                // Lose condition: Lose all player units after 30 seconds
+                if (playerUnits.length === 0 && this.gameState.gameTime > 30000) {
+                    this.showDefeatMessage();
+                }
+            }
+            showVictoryMessage() {
+                this.showMessage('Victory!', 'You have successfully defended your base!');
+            }
+            showDefeatMessage() {
+                this.showMessage('Defeat!', 'You have lost all your units!');
+            }
+            showMessage(title, text) {
+                const messageDiv = document.createElement('div');
+                messageDiv.style.cssText = `
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: rgba(0, 0, 0, 0.9);
+                    color: white;
+                    padding: 30px;
+                    border-radius: 15px;
+                    border: 2px solid #3498db;
+                    text-align: center;
+                    z-index: 1000;
+                `;
+                messageDiv.innerHTML = `
+                    <h2 style="color: #3498db; margin-bottom: 15px;">${title}</h2>
+                    <p style="margin-bottom: 20px;">${text}</p>
+                    <button onclick="location.reload()" style="
+                        padding: 10px 20px;
+                        background: #3498db;
+                        color: white;
+                        border: none;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        font-size: 16px;
+                    ">Play Again</button>
+                `;
+                document.body.appendChild(messageDiv);
+            }
+        }
+        // Initialize game when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOM Content Loaded - Starting Game...");
+            const game = new GameEngine();
+            window.game = game;
+            console.log("Game initialized and ready!");
+        });
+    </script>
+</body>
+</html>
