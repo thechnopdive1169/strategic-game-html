@@ -16,3 +16,4 @@
 * └── lib/
 *     └── (external libraries)
 * 
+https://thechnopdive1169.github.io/strategic-game-html/version5.html
